@@ -31,7 +31,7 @@ def main():
 
     print("[PG AI] Starting server...")
     proc = subprocess.Popen(
-        [sys.executable, "api.py"],
+        [sys.executable, "api/index.py"],
         cwd=str(__import__("pathlib").Path(__file__).resolve().parent),
     )
 

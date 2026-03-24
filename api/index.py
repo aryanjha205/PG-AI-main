@@ -17,8 +17,7 @@ from pydantic import BaseModel, Field
 import psycopg
 from psycopg.rows import dict_row
 
-# pgai for schema discovery
-from pgai.semantic_catalog import loader, render
+# (Removed pgai due to 5GB size constraint — using custom discovery)
 
 # BASE DIR for static files
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -116,6 +115,30 @@ class QueryRequest(BaseModel):
     selected_tables: List[str] = Field(default_factory=list)
     role: str = "viewer"
 
+async def get_schema_context(conn, table_names: List[str]) -> str:
+    """Retrieve schema details and sample data for the AI prompt."""
+    context_lines = []
+    for table in table_names:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            await cur.execute("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_name = %s AND table_schema = 'public'
+                ORDER BY ordinal_position
+            """, (table,))
+            columns = await cur.fetchall()
+            
+            try:
+                await cur.execute(f"SELECT * FROM \"{table}\" LIMIT 2")
+                samples = await cur.fetchall()
+            except Exception:
+                samples = []
+            
+            col_info = "\n  - ".join([f"{c['column_name']} ({c['data_type']})" for c in columns])
+            sample_json = json.dumps(samples, default=str)
+            context_lines.append(f"TABLE: {table}\nCOLUMNS:\n  - {col_info}\nSAMPLES: {sample_json}")
+    return "\n\n".join(context_lines)
+
 @app.get("/health-check")
 async def health_check():
     """Verify system health and active extensions."""
@@ -154,26 +177,25 @@ async def api_generate_query(req: QueryRequest):
     """NL -> pgai Schema Context -> AI -> executed Results."""
     try:
         async with await get_connection() as conn:
-            # 1. Schema discovery with pgai
+            # 1. Schema discovery (CUSTOM)
             async with conn.cursor() as cur:
                 if req.selected_tables:
-                    await cur.execute("SELECT oid FROM pg_class WHERE relname = ANY(%s) AND relkind = 'r'", (req.selected_tables,))
+                    await cur.execute("SELECT relname FROM pg_class WHERE relname = ANY(%s) AND relkind = 'r'", (req.selected_tables,))
                 else:
                     await cur.execute("""
-                        SELECT c.oid FROM pg_class c 
+                        SELECT c.relname FROM pg_class c 
                         JOIN pg_namespace n ON n.oid = c.relnamespace 
                         WHERE n.nspname = 'public' AND c.relkind = 'r' 
-                        LIMIT 20
+                        LIMIT 12
                     """)
-                oids = [r[0] for r in await cur.fetchall()]
+                table_names = [r[0] for r in await cur.fetchall()]
             
-            if not oids:
+            if not table_names:
                 return {"success": False, "error": "No tables detected in the public schema."}
 
             print(f"[{get_timestamp()}] [PG AI] Incoming query from user with role: {req.role}")
-            tables = await loader.load_tables(conn, oids=oids, sample_size=3)
-            schema_context = render.render_tables(tables)
-            print(f"[{get_timestamp()}] [PG AI] Loaded context for {len(tables)} tables.")
+            schema_context = await get_schema_context(conn, table_names)
+            print(f"[{get_timestamp()}] [PG AI] Loaded context for {len(table_names)} tables.")
             
             # 2. AI SQL Generation
             ai_data = await generate_sql_with_ai(req.prompt, schema_context)
