@@ -1,23 +1,30 @@
 {
   "version": 2,
-  "framework": null,
-  "builds": [
-    {
-      "src": "api/index.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxDuration": 60
-      }
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/(get-database-tables|generate-query|health-check|table-metadata|query-data)",
-      "dest": "api/index.py"
+      "source": "/get-database-tables",
+      "destination": "/api/index.py"
     },
     {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/generate-query",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/health-check",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/table-metadata",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/query-data",
+      "destination": "/api/index.py"
     }
   ]
 }
