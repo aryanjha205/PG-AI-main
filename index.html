@@ -780,16 +780,10 @@
         </main>
     </div>
     <div id="toast">Copied to clipboard!</div>
+
     <script>
         let chatHistory = [];
         let schema = {};
-
-        // --- CONFIG ---
-        // When deployed, change this URL to your Railway backend URL.
-        // Example: 'https://pg-ai-pro-production.up.railway.app'
-        const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-            ? '' 
-            : 'https://pg-ai-pro-production.up.railway.app'; // <--- Update this after Railway deployment!
 
         // --- INIT ---
         window.onload = () => {
@@ -825,7 +819,7 @@
         }
         async function fetchSchema() {
             try {
-                const r = await fetch(`${API_BASE_URL}/get-database-tables`);
+                const r = await fetch('/get-database-tables');
                 const data = await r.json();
                 schema = data;
                 renderSchema();
@@ -870,7 +864,7 @@
 
             const loadId = addLoad();
             try {
-                const r = await fetch(`${API_BASE_URL}/generate-query`, {
+                const r = await fetch('/generate-query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ prompt, role: 'admin', history: chatHistory })

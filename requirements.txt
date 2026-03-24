@@ -1,6 +1,6 @@
 fastapi
 uvicorn
-psycopg-binary
+psycopg[binary]
 requests
 pydantic>=2.0
 python-multipart
