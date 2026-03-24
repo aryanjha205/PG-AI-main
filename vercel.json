@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "name": "pg-ai-pro-frontend",
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "framework": null,
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
